@@ -1,4 +1,4 @@
-# run-vast
+# `run_vast`
 
 A command-line tool. Lets you put commands in markdown files, and runs them in parallel on many vast.ai instances.
 
