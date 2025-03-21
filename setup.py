@@ -12,6 +12,7 @@ setup(
     entry_points={
         'console_scripts': [
             'run_vast=run_vast.run_vast:main',
+            'rv=run_vast.run_vast:main',
         ],
     },
     author="Your Name",
