@@ -19,7 +19,8 @@ If a run starts up successfully, the code block will be marked as ```` ```vast:r
 ## Installation
 
 ```bash
-pip install run-vast
+pip install run_vast
+rv journal.md
 ```
 
 ## Usage
@@ -60,7 +61,7 @@ Register your SSH key on the vast website, then put the private key in `~/.ssh/i
 
 #### Run `run_vast my_training_runs.md`.
 
-`run_vast` will prompt you to provision two Vast instances, so it can run both commands in parallel.
+`rv` will prompt you to provision two Vast instances, so it can run both commands in parallel.
 
 Important: in the vast.ai web UI, before provisioning Vast instances, you must edit the instance template to set the environment variable `IS_FOR_AUTORUNNING=1`.
 
@@ -70,13 +71,13 @@ Remember to press the "+" button to save the environment variable.
 
 This should take a minute or so.
 
-Then, return to the `run_vast` prompt and press Enter to continue.
+Then, return to the `rv` prompt and press Enter to continue.
 
 #### Wait for your commands to finish
 
-You should track your runs via i.e. wandb. `run_vast` doesn't handle any logging for you.
+You should track your runs via i.e. wandb. `rv` doesn't handle any logging for you.
 
-Once your commands have finished, run `run_vast journal.md`.
+Once your commands have finished, run `rv journal.md`.
 
 It will move them from the `vast:running/0123456` state to the `vast:finished` state.
 
