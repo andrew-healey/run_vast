@@ -1,6 +1,6 @@
 # `run_vast`
 
-A command-line tool. Lets you put commands in markdown files, and runs them in parallel on many vast.ai instances.
+A command-line tool. Lets you put bash commands in markdown files, and runs them in parallel on many vast.ai instances.
 
 Uses a `waiting`/`running`/`fail`/`succeed` state machine to represent every command. All state is contained in the markdown file, in human-readable and human-editable form.
 
