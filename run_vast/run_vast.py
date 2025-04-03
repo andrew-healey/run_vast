@@ -263,31 +263,102 @@ def run_command_on_instance(block: CommandBlock, instance: Instance) -> None:
         block.instance_id = instance.instance_id
 
 # For all verified commands with no instance yet, assign free instances from the provided pool.
-def run_phase(blocks: List[CommandBlock], instances: List[Instance], gpus: Optional[int] = None) -> None:
+def run_phase(blocks: List[CommandBlock], instances: List[Instance], gpus: Optional[int] = None, wake_up_instances: bool = True) -> None:
     logger.info("=== Run Phase ===")
+    api = VastAPIHelper()
     # Identify instance IDs already claimed by blocks.
     claimed_ids = {block.instance_id for block in blocks
                    if block.instance_id and block.state in {CommandState.RUNNING, CommandState.FAIL, CommandState.SUCCESS}}
-    free_started_instances = [inst for inst in instances if inst.instance_id not in claimed_ids and inst.actual_status == "running"]
+    free_started_instances = [inst for inst in instances if inst.instance_id not in claimed_ids and (inst.actual_status == "running" and inst.state == "running")]
+
+    verified_blocks = [block for block in blocks if block.state == CommandState.VERIFIED and block.instance_id is None]
+
+    if len(verified_blocks) > len(free_started_instances) and wake_up_instances:
+
+        wake_up_start_time = time.time()
+        # lets do a round of wake ups!
+
+        free_inactive_instances = [inst for inst in instances if inst.instance_id not in claimed_ids and not (inst.actual_status == "running" and inst.state == "running")]
+
+        if len(free_inactive_instances) > 0:
+            logger.info(f"Found {len(free_inactive_instances)} free inactive instances. Trying to wake them up...")
+
+            # lets try to wake them up!
+            for inst in free_inactive_instances:
+                exponential_backoff_retry(lambda: api.start_instance(inst.instance_id))
+                logger.info(f"Sent wake-up signal to instance {inst.instance_id}.")
+            
+            free_inactive_instance_ids = [inst.instance_id for inst in free_inactive_instances]
+
+            # lets wait as they gradually either enter the 
+
+            max_retries = 40
+
+            for i in range(max_retries):
+                time.sleep(3)
+
+                updated_instances = get_autorunning_instances(gpus=gpus)
+                where_are_they_now_instances = [inst for inst in updated_instances if inst.instance_id in free_inactive_instance_ids]
+
+                for inst in where_are_they_now_instances:
+                    if inst.actual_status == "running":
+                        logger.info(f"Instance {inst.instance_id} is running again.")
+                        free_inactive_instance_ids.remove(inst.instance_id)
+                    else:
+                        if inst.state == 'running':
+                            pass
+                        else:
+                            # this is 'scheduling', let's just stop it then.
+                            exponential_backoff_retry(lambda: api.stop_instance(inst.instance_id))
+                            free_inactive_instance_ids.remove(inst.instance_id)
+                            logger.info(f"Sent stop signal to instance {inst.instance_id}.")
+                
+                if len(free_inactive_instance_ids) == 0:
+                    break
+            
+            if len(free_inactive_instance_ids) > 0:
+                logger.warning(f"Some instances are neither running nor inactive. What does this mean??? Statuses={list(set([inst.actual_status for inst in instances]))}")
+            
+            logger.info(f"Wake-up round took {time.time() - wake_up_start_time} seconds.")
+
+        else:
+            logger.warning(f"Some instances are neither running nor inactive. What does this mean??? Statuses={list(set([inst.actual_status for inst in instances]))}")
+
+    free_started_instances = [inst for inst in get_autorunning_instances(gpus=gpus) if inst.instance_id not in claimed_ids and (inst.actual_status == "running" and inst.state == "running")]
+
     logger.info(f"{len(free_started_instances)} instances of {len(instances)} were free and started.")
     num_blocks_run = 0
-    for block in blocks:
-        if block.state == CommandState.VERIFIED and block.instance_id is None:
-            if free_started_instances:
-                instance = free_started_instances.pop(0)
-                run_command_on_instance(block, instance)
-                logger.debug(f"Assigned block {block.index} to instance {instance.instance_id}. Running command \"{block.content}\".")
-                num_blocks_run += 1
-            else:
-                logger.info(f"No free instances available for block {block.index}. Skipping.")
-    
+    for block in verified_blocks:
+        if free_started_instances:
+            instance = free_started_instances.pop(0)
+            run_command_on_instance(block, instance)
+            logger.debug(f"Assigned block {block.index} to instance {instance.instance_id}. Running command \"{block.content}\".")
+            num_blocks_run += 1
+        else:
+            logger.info(f"No free instances available for block {block.index}. Skipping.")
+
     running_blocks = [block for block in blocks if block.state == CommandState.RUNNING]
 
     if len(running_blocks) == 0 or num_blocks_run == 0:
         return
     
-    logger.info("Sleeping for 20 seconds to allow instances to label themselves as running.")
-    time.sleep(20)
+    logger.info("Waiting to allow instances to label themselves as running.")
+    max_time = 20
+    start_time = time.time()
+    while time.time() - start_time < max_time:
+        time.sleep(2.5)
+        updated_instances = get_autorunning_instances(gpus=gpus)
+
+        must_keep_waiting = False
+        for block in running_blocks:
+            matching_instances = [inst for inst in updated_instances if inst.instance_id == block.instance_id]
+            if matching_instances:
+                matching_instance = matching_instances.pop()
+                if not matching_instance.label or str(matching_instance.label) == "None":
+                    must_keep_waiting = True
+
+        if not must_keep_waiting:
+            break
 
     updated_instances = get_autorunning_instances(gpus=gpus)
     logger.info(f"Found {len(updated_instances)} updated instances.")
@@ -448,6 +519,8 @@ def main():
     parser.set_defaults(provision=False)
     parser.add_argument("--gpus", type=int, help="Only operate on instances with this # of GPUs", dest="gpus")
     parser.set_defaults(gpus=None)
+    parser.add_argument("--wake_up_instances", action="store_true", help="Wake up instances that are not running", dest="wake_up_instances")
+    parser.set_defaults(wake_up_instances=True)
     parser.add_argument("--repeat", type=int, help="Repeat the script this many times", dest="repeat")
     parser.set_defaults(repeat=1)
     args = parser.parse_args()
@@ -477,7 +550,7 @@ def main():
 
 
                 # Phase 3: Run Phase
-                run_phase(blocks, instances, gpus=args.gpus)
+                run_phase(blocks, instances, gpus=args.gpus, wake_up_instances=args.wake_up_instances)
                 writeback_file(fw, file_text, blocks)
 
 
