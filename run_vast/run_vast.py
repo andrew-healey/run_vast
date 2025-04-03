@@ -448,48 +448,51 @@ def main():
     parser.set_defaults(provision=True)
     parser.add_argument("--gpus", type=int, help="Only operate on instances with this # of GPUs", dest="gpus")
     parser.set_defaults(gpus=None)
+    parser.add_argument("--repeat", type=int, help="Repeat the script this many times", dest="repeat")
+    parser.set_defaults(repeat=1)
     args = parser.parse_args()
 
-    try:
-        with open(args.filename, "r") as f:
-            file_text = f.read()
-    except FileNotFoundError:
-        logger.error(f"File {args.filename} not found.")
-        sys.exit(1)
-    
-    with open(args.filename, "w") as fw:
+    for i in range(args.repeat):
         try:
-            blocks = parse_command_blocks(file_text)
-            logger.info(f"Found {len(blocks)} vast command block(s).")
-            writeback_file(fw, file_text, blocks)
+            with open(args.filename, "r") as f:
+                file_text = f.read()
+        except FileNotFoundError:
+            logger.error(f"File {args.filename} not found.")
+            sys.exit(1)
+        
+        with open(args.filename, "w") as fw:
+            try:
+                blocks = parse_command_blocks(file_text)
+                logger.info(f"Found {len(blocks)} vast command block(s).")
+                writeback_file(fw, file_text, blocks)
 
-            # Phase 1: Verification
-            verify_phase(blocks)
-            writeback_file(fw, file_text, blocks)
-
-
-            # Phase 2: Provision/Delete Phase
-            instances = provision_phase(blocks, should_deprovision=args.deprovision, should_provision=args.provision, gpus=args.gpus)
-            writeback_file(fw, file_text, blocks)
-
-
-            # Phase 3: Run Phase
-            run_phase(blocks, instances, gpus=args.gpus)
-            writeback_file(fw, file_text, blocks)
+                # Phase 1: Verification
+                verify_phase(blocks)
+                writeback_file(fw, file_text, blocks)
 
 
-            # Phase 4: Check Phase
-            check_phase(blocks, gpus=args.gpus)
-            writeback_file(fw, file_text, blocks)
+                # Phase 2: Provision/Delete Phase
+                instances = provision_phase(blocks, should_deprovision=args.deprovision, should_provision=args.provision, gpus=args.gpus)
+                writeback_file(fw, file_text, blocks)
 
 
-            # Phase 5: Finish Phase (if needed)
-            finish_phase(blocks, delete_finished_instances=args.deprovision)
-            writeback_file(fw, file_text, blocks)
+                # Phase 3: Run Phase
+                run_phase(blocks, instances, gpus=args.gpus)
+                writeback_file(fw, file_text, blocks)
 
-        finally:
-            # Final write back.
-            writeback_file(fw, file_text, blocks)
+
+                # Phase 4: Check Phase
+                check_phase(blocks, gpus=args.gpus)
+                writeback_file(fw, file_text, blocks)
+
+
+                # Phase 5: Finish Phase (if needed)
+                finish_phase(blocks, delete_finished_instances=args.deprovision)
+                writeback_file(fw, file_text, blocks)
+
+            finally:
+                # Final write back.
+                writeback_file(fw, file_text, blocks)
 
 if __name__ == "__main__":
     main()
