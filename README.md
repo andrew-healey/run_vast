@@ -1,6 +1,6 @@
 # `run_vast`
 
-A command-line tool. Lets you put commands in markdown files, and runs them in parallel on many vast.ai instances.
+A command-line tool. Lets you put bash commands in markdown files, and runs them in parallel on many vast.ai instances.
 
 Uses a `waiting`/`running`/`fail`/`succeed` state machine to represent every command. All state is contained in the markdown file, in human-readable and human-editable form.
 
@@ -10,7 +10,7 @@ Vast lets me keep these nodes idle for very cheap. So by default, all instances 
 
 Then later, I will add a new ML experiment to my `journal.md` file. Every training run in the experiment is a bash command in a triple-backtick ```` ```vast```` code block.
 
-Then I run `run_vast journal.md` to run them all in parallel. Each Vast instance will go idle when its command succeeds.
+Then I run `rv journal.md` to run them all in parallel. Each Vast instance will go idle when its command succeeds.
 
 If a run fails, the code block will be marked as ```` ```vast:fail/012345````, where `012345` is the instance ID of the machine it ran on. I can then ssh into the instance and debug my training run.
 
@@ -19,7 +19,8 @@ If a run starts up successfully, the code block will be marked as ```` ```vast:r
 ## Installation
 
 ```bash
-pip install run-vast
+pip install run_vast
+rv journal.md
 ```
 
 ## Usage
@@ -52,41 +53,33 @@ python train.py config/train_shakespeare_char.py --min_lr=1.5e-4
 ```
 ````
 
-#### Set up your Vast account.
+#### Set up your Vast account
 
 You need to make an SSH key to connect to Vast instances.
 
 Register your SSH key on the vast website, then put the private key in `~/.ssh/id_vast`.
 
-#### Run `run_vast my_training_runs.md`.
+#### Run `rv my_training_runs.md`
 
-`run_vast` will prompt you to provision two Vast instances, so it can run both commands in parallel.
+`rv` will prompt you to provision two Vast instances, so it can run both commands in parallel.
 
 Important: in the vast.ai web UI, before provisioning Vast instances, you must edit the instance template to set the environment variable `IS_FOR_AUTORUNNING=1`.
 
 Remember to press the "+" button to save the environment variable.
 
-#### Go to the Vast dashboard and wait for your instances to be "Connected".
+#### Go to the Vast dashboard and wait for your instances to be "Connected"
 
 This should take a minute or so.
 
-Then, return to the `run_vast` prompt and press Enter to continue.
+Then, return to the `rv` prompt and press Enter to continue.
 
 #### Wait for your commands to finish
 
-You should track your runs via i.e. wandb. `run_vast` doesn't handle any logging for you.
+You should track your runs via i.e. wandb. `rv` doesn't handle any logging for you.
 
-Once your commands have finished, run `run_vast journal.md`.
+Once your commands have finished, run `rv journal.md`.
 
 It will move them from the `vast:running/0123456` state to the `vast:finished` state.
-
-## Requirements
-
-- Python 3.6 or higher
-- vast-ai-api
-- coloredlogs
-- pandas
-- VAST_AI_API_KEY environment variable set
 
 ## License
 
