@@ -318,6 +318,10 @@ def run_phase(blocks: List[CommandBlock], instances: List[Instance], gpus: Optio
             
             if len(free_inactive_instance_ids) > 0:
                 logger.warning(f"Some instances are neither running nor inactive. What does this mean??? Statuses={list(set([inst.actual_status for inst in instances]))}")
+                # lets put them to sleep
+                for inst in free_inactive_instance_ids:
+                    exponential_backoff_retry(lambda: api.stop_instance(inst))
+                    logger.info(f"Sent stop signal to instance {inst}.")
             
             logger.info(f"Wake-up round took {time.time() - wake_up_start_time} seconds.")
 
