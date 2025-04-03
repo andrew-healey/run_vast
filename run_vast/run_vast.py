@@ -278,7 +278,7 @@ def run_phase(blocks: List[CommandBlock], instances: List[Instance], gpus: Optio
         wake_up_start_time = time.time()
         # lets do a round of wake ups!
 
-        free_inactive_instances = [inst for inst in instances if inst.instance_id not in claimed_ids and not (inst.actual_status == "running" and inst.state == "running")]
+        free_inactive_instances = [inst for inst in instances if inst.instance_id not in claimed_ids and inst.actual_status != "loading" and not (inst.actual_status == "running" and inst.state == "running")]
 
         if len(free_inactive_instances) > 0:
             logger.info(f"Found {len(free_inactive_instances)} free inactive instances. Trying to wake them up...")
