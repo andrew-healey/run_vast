@@ -283,12 +283,25 @@ def run_phase(blocks: List[CommandBlock], instances: List[Instance], gpus: Optio
         if len(free_inactive_instances) > 0:
             logger.info(f"Found {len(free_inactive_instances)} free inactive instances. Trying to wake them up...")
 
+            
+            free_inactive_instance_ids = []
+
             # lets try to wake them up!
             for inst in free_inactive_instances:
-                exponential_backoff_retry(lambda: api.start_instance(inst.instance_id))
-                logger.info(f"Sent wake-up signal to instance {inst.instance_id}.")
-            
-            free_inactive_instance_ids = [inst.instance_id for inst in free_inactive_instances]
+                def maybe_start_instance() -> bool:
+                    try:
+                        api.start_instance(inst.instance_id)
+                        return True
+                    except Exception as e:
+                        logger.error(f"Error starting instance {inst.instance_id}: {e}")
+                        return False
+
+                if maybe_start_instance():
+                    logger.info(f"Sent wake-up signal to instance {inst.instance_id}.")
+                    free_inactive_instance_ids.append(inst.instance_id)
+                else:
+                    logger.warn(f"Failed to send wake-up signal to instance {inst.instance_id}.")
+
 
             # lets wait as they gradually either enter the 
 
